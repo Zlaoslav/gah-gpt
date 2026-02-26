@@ -86,7 +86,7 @@ header h1 { margin: 0; font-size: 18px; font-weight: 600; }
   resize: none;
   overflow: hidden;
   line-height: 1.4;
-  max-height: 150px; /* ограничение роста поля */
+  max-height: 150px;
   transition: border 0.2s, background 0.2s;
 }
 
@@ -128,7 +128,11 @@ button:active:not(:disabled) { transform: scale(0.97); }
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
-const BACKEND_URL = "http://gahgpt.slavi.workers.dev";
+let BACKEND_URL = "http://gahgpt.slavi.workers.dev";
+if(location.protocol === "https:"){
+  BACKEND_URL = BACKEND_URL.replace("http://", "https://");
+}
+
 const COOLDOWN = 6;
 const MAX_CHARS = 5000;
 const MAX_MESSAGES = 100;
@@ -171,7 +175,7 @@ input.addEventListener("keydown", e => {
 
 function autoResize(el){
   el.style.height = "auto";
-  el.style.height = Math.min(el.scrollHeight, 150) + "px"; // ограничение
+  el.style.height = Math.min(el.scrollHeight, 150) + "px";
 }
 
 function checkLimit(){
