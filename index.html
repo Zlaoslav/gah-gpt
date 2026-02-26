@@ -14,6 +14,7 @@
   --primary: #3b82f6;
   --text: #e5e7eb;
   --muted: #94a3b8;
+  --warn: #f87171;
 }
 
 * { box-sizing: border-box; }
@@ -70,7 +71,8 @@ header h1 { margin: 0; font-size: 18px; font-weight: 600; }
 /* Input */
 #input-container {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: 6px;
   padding: 14px 20px;
   background: var(--surface);
   border-top: 1px solid var(--border);
@@ -85,7 +87,7 @@ header h1 { margin: 0; font-size: 18px; font-weight: 600; }
   color: var(--text);
   font-size: 15px;
   outline: none;
-  resize: none; /* авто-рост через JS */
+  resize: none;
   overflow: hidden;
   line-height: 1.4;
   transition: border 0.2s, background 0.2s;
@@ -107,6 +109,8 @@ button {
 button:disabled { opacity: 0.4; cursor: not-allowed; }
 button:hover:not(:disabled) { opacity: 0.9; }
 button:active:not(:disabled) { transform: scale(0.97); }
+
+#limitWarning { color: var(--warn); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -120,64 +124,114 @@ button:active:not(:disabled) { transform: scale(0.97); }
 
 <div id="input-container">
   <textarea id="textInput" placeholder="Введите сообщение..." rows="1"></textarea>
-  <button id="sendBtn" onclick="sendMessage()">Отправить</button>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <button id="sendBtn" onclick="sendMessage()">Отправить</button>
+    <div id="limitWarning"></div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
 const BACKEND_URL = "http://gahgpt.slavi.workers.dev";
 const COOLDOWN = 11;
+const MAX_CHARS = 5000;
+const MAX_MESSAGES = 100; // максимальное количество сообщений в памяти
 
 const input = document.getElementById("textInput");
 const chat = document.getElementById("chat");
 const sendBtn = document.getElementById("sendBtn");
+const limitWarning = document.getElementById("limitWarning");
 
 let cooldownTimer = 0;
 let typingDotsInterval;
+let dialogHistory = []; // {role:"user"/"bot", text:"..."}
 
+// Загрузка сохранённого диалога и черновика
 window.onload = () => {
   const savedText = localStorage.getItem("draft_text");
-  if (savedText) input.value = savedText;
+  if(savedText) input.value = savedText;
+
+  const savedDialog = localStorage.getItem("dialog_history");
+  if(savedDialog){
+    dialogHistory = JSON.parse(savedDialog);
+    dialogHistory.forEach(msg=>{
+      addMessage(msg.text, msg.role);
+    });
+  }
   autoResize(input);
+  checkLimit();
 };
 
+// Авто-рост поля ввода и проверка лимита
 input.addEventListener("input", () => {
-  localStorage.setItem("draft_text", input.value);
   autoResize(input);
+  localStorage.setItem("draft_text", input.value);
+  checkLimit();
+});
+input.addEventListener("keydown", e => { 
+  if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); sendMessage(); }
 });
 
-input.addEventListener("keydown", e => { if(e.key==="Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
-
-// авто-рост поля ввода
-function autoResize(el) {
+function autoResize(el){
   el.style.height = "auto";
   el.style.height = el.scrollHeight + "px";
 }
 
-// добавление сообщения
-function addMessage(text, sender) {
+// Проверка лимита
+function checkLimit(){
+  if(input.value.length > MAX_CHARS){
+    sendBtn.disabled = true;
+    limitWarning.textContent = `Превышен лимит ${MAX_CHARS} символов!`;
+  } else {
+    limitWarning.textContent = "";
+    if(cooldownTimer<=0) sendBtn.disabled = false;
+  }
+}
+
+// Добавление сообщения
+function addMessage(text, sender){
   const msg = document.createElement("div");
   msg.className = `message ${sender}`;
-  if(sender==="bot"){ msg.innerHTML = text; }
-  else { msg.textContent = text; }
+  if(sender==="bot"){
+    const span = document.createElement("span");
+    msg.appendChild(span);
+  } else {
+    msg.textContent = text;
+  }
   chat.appendChild(msg);
   chat.scrollTop = chat.scrollHeight;
   return msg;
 }
 
-// печатает с анимацией ". .. ..."
-function typeEffectWithDots(element, text, speed=18) {
-  element.innerHTML = "";
+// Печатает с анимацией ". .. ..." и автопрокруткой
+function typeEffectWithDots(element, text, speed=18){
+  const span = element.querySelector("span");
+  if(!span) return;
+  span.textContent = "";
   let i=0, dots=0;
-  typingDotsInterval = setInterval(()=>{
-    if(i>=text.length){ clearInterval(typingDotsInterval); element.innerHTML = marked.parse(element.textContent); return; }
-    if(dots<3){ element.innerHTML = element.innerHTML.replace(/\.{1,3}$/, "") + "."; dots++; }
-    else{ dots=0; element.innerHTML = element.innerHTML.replace(/\.{1,3}$/, ""); }
-  }, 500);
 
-  function typing() {
+  typingDotsInterval = setInterval(()=>{
+    if(i >= text.length){
+      clearInterval(typingDotsInterval);
+      element.innerHTML = marked.parse(text);
+      element.style.maxWidth = "65%";
+      element.style.whiteSpace = "pre-wrap";
+      chat.scrollTop = chat.scrollHeight;
+      return;
+    }
+    if(dots<3){ 
+      span.textContent = span.textContent.replace(/\.{1,3}$/, "") + "."; 
+      dots++; 
+    } else { 
+      dots=0; 
+      span.textContent = span.textContent.replace(/\.{1,3}$/, ""); 
+    }
+    chat.scrollTop = chat.scrollHeight;
+  },500);
+
+  function typing(){
     if(i<text.length){
-      element.textContent += text.charAt(i);
+      span.textContent += text.charAt(i);
       i++;
       chat.scrollTop = chat.scrollHeight;
       setTimeout(typing, speed);
@@ -186,49 +240,73 @@ function typeEffectWithDots(element, text, speed=18) {
   typing();
 }
 
-// кулдаун кнопки
-function startCooldown() {
+// Кулдаун кнопки
+function startCooldown(){
   cooldownTimer = COOLDOWN;
   sendBtn.disabled = true;
   const interval = setInterval(()=>{
     cooldownTimer -= 0.1;
-    if(cooldownTimer <=0){
-      sendBtn.disabled = false;
+    checkLimit();
+    if(cooldownTimer <= 0){
+      sendBtn.disabled = input.value.length>MAX_CHARS;
       clearInterval(interval);
     }
   },100);
 }
 
-// отправка сообщения
-async function sendMessage() {
-  if (sendBtn.disabled) return;
-  const text = input.value.trim();
-  if (!text) return;
+// Сохранение диалога в localStorage с лимитом MAX_MESSAGES
+function saveDialog(){
+  while(dialogHistory.length > MAX_MESSAGES){
+    dialogHistory.shift(); // удаляем старые
+  }
+  localStorage.setItem("dialog_history", JSON.stringify(dialogHistory));
+}
 
-  addMessage(text, "user");
-  input.value = "";
+// Отправка сообщения
+async function sendMessage(){
+  if(sendBtn.disabled) return;
+  const text = input.value.trim();
+  if(!text) return;
+  if(text.length > MAX_CHARS) return;
+
+  addMessage(text,"user");
+  dialogHistory.push({role:"user", text});
+  saveDialog();
+
+  input.value="";
   localStorage.removeItem("draft_text");
   autoResize(input);
+  checkLimit();
 
   sendBtn.disabled = true;
   startCooldown();
 
   const botMessage = addMessage("", "bot");
 
-  try {
-    const response = await fetch(`${BACKEND_URL}/ask?text=${encodeURIComponent(text)}`);
+  try{
+    // Формируем последние 5000 символов диалога
+    let dialogText = "";
+    for(let i=dialogHistory.length-1;i>=0;i--){
+      const roleLabel = dialogHistory[i].role==="user"?"User: ":"Bot: ";
+      const entry = roleLabel + dialogHistory[i].text + "\n";
+      if((entry + dialogText).length>5000) break;
+      dialogText = entry + dialogText;
+    }
 
-    if (!response.ok) {
+    const response = await fetch(`${BACKEND_URL}/ask?text=${encodeURIComponent(dialogText)}`);
+    if(!response.ok){
       botMessage.textContent = "Ошибка соединения с сервером.";
       return;
     }
 
-    // Получаем просто текст
     const data = await response.text();
+    dialogHistory.push({role:"bot", text:data});
+    saveDialog();
 
     clearInterval(typingDotsInterval);
-    typeEffectWithDots(botMessage, data); // передаем текст напрямую
-  } catch (err) {
+    typeEffectWithDots(botMessage, data);
+
+  } catch(err){
     botMessage.textContent = "Ошибка соединения с сервером.";
   }
 }
