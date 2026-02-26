@@ -38,16 +38,8 @@ header {
   border-bottom: 1px solid var(--border);
 }
 
-header img {
-  width: 36px;
-  height: 36px;
-}
-
-header h1 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-}
+header img { width: 36px; height: 36px; }
+header h1 { margin: 0; font-size: 18px; font-weight: 600; }
 
 /* Chat */
 #chat {
@@ -70,22 +62,10 @@ header h1 {
   animation: fadeIn 0.2s ease;
 }
 
-.user {
-  align-self: flex-end;
-  background: var(--primary);
-  color: white;
-}
+.user { align-self: flex-end; background: var(--primary); color: white; }
+.bot { align-self: flex-start; background: var(--surface-2); border: 1px solid var(--border); }
 
-.bot {
-  align-self: flex-start;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+@keyframes fadeIn { from {opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
 
 /* Input */
 #input-container {
@@ -98,22 +78,21 @@ header h1 {
 
 #textInput {
   flex: 1;
-  padding: 12px 14px;
+  padding: 10px 14px;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text);
   font-size: 15px;
   outline: none;
+  resize: none; /* авто-рост через JS */
+  overflow: hidden;
+  line-height: 1.4;
   transition: border 0.2s, background 0.2s;
 }
 
 #textInput::placeholder { color: var(--muted); }
-
-#textInput:focus {
-  border-color: var(--primary);
-  background: #162133;
-}
+#textInput:focus { border-color: var(--primary); background: #162133; }
 
 button {
   padding: 12px 18px;
@@ -125,19 +104,9 @@ button {
   font-weight: 600;
   transition: opacity 0.2s, transform 0.1s;
 }
-
-button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-button:hover:not(:disabled) {
-  opacity: 0.9;
-}
-
-button:active:not(:disabled) {
-  transform: scale(0.97);
-}
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+button:hover:not(:disabled) { opacity: 0.9; }
+button:active:not(:disabled) { transform: scale(0.97); }
 </style>
 </head>
 <body>
@@ -150,7 +119,7 @@ button:active:not(:disabled) {
 <div id="chat"></div>
 
 <div id="input-container">
-  <input type="text" id="textInput" placeholder="Введите сообщение...">
+  <textarea id="textInput" placeholder="Введите сообщение..." rows="1"></textarea>
   <button id="sendBtn" onclick="sendMessage()">Отправить</button>
 </div>
 
@@ -164,45 +133,54 @@ const chat = document.getElementById("chat");
 const sendBtn = document.getElementById("sendBtn");
 
 let cooldownTimer = 0;
+let typingDotsInterval;
 
 window.onload = () => {
   const savedText = localStorage.getItem("draft_text");
   if (savedText) input.value = savedText;
+  autoResize(input);
 };
 
 input.addEventListener("input", () => {
   localStorage.setItem("draft_text", input.value);
+  autoResize(input);
 });
 
-input.addEventListener("keydown", e => {
-  if (e.key === "Enter") sendMessage();
-});
+input.addEventListener("keydown", e => { if(e.key==="Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
 
+// авто-рост поля ввода
+function autoResize(el) {
+  el.style.height = "auto";
+  el.style.height = el.scrollHeight + "px";
+}
+
+// добавление сообщения
 function addMessage(text, sender) {
   const msg = document.createElement("div");
   msg.className = `message ${sender}`;
-  if(sender==="bot"){
-    msg.innerHTML = marked.parse(text);
-  } else {
-    msg.textContent = text;
-  }
+  if(sender==="bot"){ msg.innerHTML = text; }
+  else { msg.textContent = text; }
   chat.appendChild(msg);
   chat.scrollTop = chat.scrollHeight;
   return msg;
 }
 
-function typeEffect(element, text, speed = 18) {
-  let i = 0;
-  element.innerHTML = ""; // очищаем
+// печатает с анимацией ". .. ..."
+function typeEffectWithDots(element, text, speed=18) {
+  element.innerHTML = "";
+  let i=0, dots=0;
+  typingDotsInterval = setInterval(()=>{
+    if(i>=text.length){ clearInterval(typingDotsInterval); element.innerHTML = marked.parse(element.textContent); return; }
+    if(dots<3){ element.innerHTML = element.innerHTML.replace(/\.{1,3}$/, "") + "."; dots++; }
+    else{ dots=0; element.innerHTML = element.innerHTML.replace(/\.{1,3}$/, ""); }
+  }, 500);
+
   function typing() {
-    if (i < text.length) {
-      element.innerHTML += text.charAt(i);
+    if(i<text.length){
+      element.textContent += text.charAt(i);
       i++;
       chat.scrollTop = chat.scrollHeight;
       setTimeout(typing, speed);
-    } else {
-      // после завершения отображаем Markdown полностью
-      element.innerHTML = marked.parse(element.textContent);
     }
   }
   typing();
@@ -212,39 +190,37 @@ function typeEffect(element, text, speed = 18) {
 function startCooldown() {
   cooldownTimer = COOLDOWN;
   sendBtn.disabled = true;
-  const interval = setInterval(() => {
+  const interval = setInterval(()=>{
     cooldownTimer -= 0.1;
-    if(cooldownTimer <= 0){
+    if(cooldownTimer <=0){
       sendBtn.disabled = false;
       clearInterval(interval);
     }
-  }, 100);
+  },100);
 }
 
+// отправка сообщения
 async function sendMessage() {
   if(sendBtn.disabled) return;
-
   const text = input.value.trim();
-  if (!text) return;
+  if(!text) return;
 
-  addMessage(text, "user");
-  input.value = "";
+  addMessage(text,"user");
+  input.value="";
   localStorage.removeItem("draft_text");
+  autoResize(input);
 
   sendBtn.disabled = true;
   startCooldown();
 
   const botMessage = addMessage("", "bot");
 
-  try {
-    const response = await fetch(
-      `${BACKEND_URL}/ask?text=${encodeURIComponent(text)}`
-    );
-
+  try{
+    const response = await fetch(`${BACKEND_URL}/ask?text=${encodeURIComponent(text)}`);
     const data = await response.json();
-    typeEffect(botMessage, data.response);
-
-  } catch (err) {
+    clearInterval(typingDotsInterval);
+    typeEffectWithDots(botMessage, data.response);
+  }catch(err){
     botMessage.textContent = "Ошибка соединения с сервером.";
   }
 }
