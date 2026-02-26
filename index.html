@@ -255,17 +255,20 @@ function saveDialog(){
   localStorage.setItem("dialog_history", JSON.stringify(dialogHistory));
 }
 
-async function sendMessage(){
-  if(sendBtn.disabled) return;
-  const text = input.value.trim();
-  if(!text) return;
-  if(text.length > MAX_CHARS) return;
+async function sendMessage() {
+  if (sendBtn.disabled) return;
 
-  renderMessage(text,"user");
-  dialogHistory.push({role:"user", text});
+  const text = input.value.trim();
+  if (!text) return;
+  if (text.length > MAX_CHARS) return;
+
+  // Показываем сообщение пользователя
+  renderMessage(text, "user");
+  dialogHistory.push({ role: "user", text });
   saveDialog();
 
-  input.value="";
+  // Очистка поля ввода
+  input.value = "";
   localStorage.removeItem("draft_text");
   autoResize(input);
   checkLimit();
@@ -273,31 +276,36 @@ async function sendMessage(){
   sendBtn.disabled = true;
   startCooldown();
 
+  // Создаём пустое сообщение бота
   const botMessage = renderMessage("", "bot");
 
-  try{
+  try {
+    // Формируем контекст последних 5000 символов
     let dialogText = "";
-    for(let i=dialogHistory.length-1;i>=0;i--){
-      const roleLabel = dialogHistory[i].role==="user"?"User: ":"Bot: ";
+    for (let i = dialogHistory.length - 1; i >= 0; i--) {
+      const roleLabel = dialogHistory[i].role === "user" ? "User: " : "Bot: ";
       const entry = roleLabel + dialogHistory[i].text + "\n";
-      if((entry + dialogText).length>5000) break;
+      if ((entry + dialogText).length > 5000) break;
       dialogText = entry + dialogText;
     }
 
     const response = await fetch(`${BACKEND_URL}/ask?text=${encodeURIComponent(dialogText)}`);
-    if(!response.ok){
+    if (!response.ok) {
       botMessage.textContent = "Ошибка соединения с сервером.";
       return;
     }
 
-    const data = await response.text();
-    dialogHistory.push({role:"bot", text:data});
+    // Ждём JSON с полем "text"
+    const data = await response.json();
+    const botText = data.text || "Ошибка: пустой ответ от сервера.";
+
+    dialogHistory.push({ role: "bot", text: botText });
     saveDialog();
 
     clearInterval(typingDotsInterval);
-    typeEffectWithDots(botMessage, data);
+    typeEffectWithDots(botMessage, botText);
 
-  } catch(err){
+  } catch (err) {
     botMessage.textContent = "Ошибка соединения с сервером.";
   }
 }
