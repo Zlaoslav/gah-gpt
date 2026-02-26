@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Гах ГПТ</title>
-
 <style>
 :root {
   --bg: #0b0f19;
@@ -29,7 +28,6 @@ body {
   height: 100vh;
 }
 
-/* Header */
 header {
   display: flex;
   align-items: center;
@@ -42,7 +40,6 @@ header {
 header img { width: 36px; height: 36px; }
 header h1 { margin: 0; font-size: 18px; font-weight: 600; }
 
-/* Chat */
 #chat {
   flex: 1;
   overflow-y: auto;
@@ -68,7 +65,6 @@ header h1 { margin: 0; font-size: 18px; font-weight: 600; }
 
 @keyframes fadeIn { from {opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
 
-/* Input */
 #input-container {
   display: flex;
   flex-direction: column;
@@ -135,7 +131,7 @@ button:active:not(:disabled) { transform: scale(0.97); }
 const BACKEND_URL = "http://gahgpt.slavi.workers.dev";
 const COOLDOWN = 11;
 const MAX_CHARS = 5000;
-const MAX_MESSAGES = 100; // максимальное количество сообщений в памяти
+const MAX_MESSAGES = 100;
 
 const input = document.getElementById("textInput");
 const chat = document.getElementById("chat");
@@ -144,9 +140,8 @@ const limitWarning = document.getElementById("limitWarning");
 
 let cooldownTimer = 0;
 let typingDotsInterval;
-let dialogHistory = []; // {role:"user"/"bot", text:"..."}
+let dialogHistory = [];
 
-// Загрузка сохранённого диалога и черновика
 window.onload = () => {
   const savedText = localStorage.getItem("draft_text");
   if(savedText) input.value = savedText;
@@ -155,19 +150,21 @@ window.onload = () => {
   if(savedDialog){
     dialogHistory = JSON.parse(savedDialog);
     dialogHistory.forEach(msg=>{
-      addMessage(msg.text, msg.role);
+      renderMessage(msg.text, msg.role);
     });
   }
+
   autoResize(input);
+  chat.scrollTop = chat.scrollHeight;
   checkLimit();
 };
 
-// Авто-рост поля ввода и проверка лимита
 input.addEventListener("input", () => {
   autoResize(input);
   localStorage.setItem("draft_text", input.value);
   checkLimit();
 });
+
 input.addEventListener("keydown", e => { 
   if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); sendMessage(); }
 });
@@ -177,24 +174,22 @@ function autoResize(el){
   el.style.height = el.scrollHeight + "px";
 }
 
-// Проверка лимита
 function checkLimit(){
   if(input.value.length > MAX_CHARS){
     sendBtn.disabled = true;
     limitWarning.textContent = `Превышен лимит ${MAX_CHARS} символов!`;
   } else {
     limitWarning.textContent = "";
-    if(cooldownTimer<=0) sendBtn.disabled = false;
+    if(cooldownTimer <= 0) sendBtn.disabled = false;
   }
 }
 
-// Добавление сообщения
-function addMessage(text, sender){
+// рендер сообщений без пустого span для бот-сообщений (чтобы кнопка не съезжала)
+function renderMessage(text, role){
   const msg = document.createElement("div");
-  msg.className = `message ${sender}`;
-  if(sender==="bot"){
-    const span = document.createElement("span");
-    msg.appendChild(span);
+  msg.className = `message ${role}`;
+  if(role==="bot"){
+    msg.innerHTML = marked.parse(text);
   } else {
     msg.textContent = text;
   }
@@ -203,11 +198,9 @@ function addMessage(text, sender){
   return msg;
 }
 
-// Печатает с анимацией ". .. ..." и автопрокруткой
 function typeEffectWithDots(element, text, speed=18){
+  element.innerHTML = "<span></span>";
   const span = element.querySelector("span");
-  if(!span) return;
-  span.textContent = "";
   let i=0, dots=0;
 
   typingDotsInterval = setInterval(()=>{
@@ -215,19 +208,18 @@ function typeEffectWithDots(element, text, speed=18){
       clearInterval(typingDotsInterval);
       element.innerHTML = marked.parse(text);
       element.style.maxWidth = "65%";
-      element.style.whiteSpace = "pre-wrap";
       chat.scrollTop = chat.scrollHeight;
       return;
     }
     if(dots<3){ 
-      span.textContent = span.textContent.replace(/\.{1,3}$/, "") + "."; 
-      dots++; 
-    } else { 
-      dots=0; 
-      span.textContent = span.textContent.replace(/\.{1,3}$/, ""); 
+      span.textContent = span.textContent.replace(/\.{1,3}$/,"") + ".";
+      dots++;
+    } else {
+      dots=0;
+      span.textContent = span.textContent.replace(/\.{1,3}$/,"");
     }
     chat.scrollTop = chat.scrollHeight;
-  },500);
+  }, 500);
 
   function typing(){
     if(i<text.length){
@@ -240,7 +232,6 @@ function typeEffectWithDots(element, text, speed=18){
   typing();
 }
 
-// Кулдаун кнопки
 function startCooldown(){
   cooldownTimer = COOLDOWN;
   sendBtn.disabled = true;
@@ -248,28 +239,26 @@ function startCooldown(){
     cooldownTimer -= 0.1;
     checkLimit();
     if(cooldownTimer <= 0){
-      sendBtn.disabled = input.value.length>MAX_CHARS;
+      sendBtn.disabled = input.value.length > MAX_CHARS;
       clearInterval(interval);
     }
-  },100);
+  }, 100);
 }
 
-// Сохранение диалога в localStorage с лимитом MAX_MESSAGES
 function saveDialog(){
   while(dialogHistory.length > MAX_MESSAGES){
-    dialogHistory.shift(); // удаляем старые
+    dialogHistory.shift();
   }
   localStorage.setItem("dialog_history", JSON.stringify(dialogHistory));
 }
 
-// Отправка сообщения
 async function sendMessage(){
   if(sendBtn.disabled) return;
   const text = input.value.trim();
   if(!text) return;
   if(text.length > MAX_CHARS) return;
 
-  addMessage(text,"user");
+  renderMessage(text,"user");
   dialogHistory.push({role:"user", text});
   saveDialog();
 
@@ -281,10 +270,9 @@ async function sendMessage(){
   sendBtn.disabled = true;
   startCooldown();
 
-  const botMessage = addMessage("", "bot");
+  const botMessage = renderMessage("", "bot");
 
   try{
-    // Формируем последние 5000 символов диалога
     let dialogText = "";
     for(let i=dialogHistory.length-1;i>=0;i--){
       const roleLabel = dialogHistory[i].role==="user"?"User: ":"Bot: ";
