@@ -201,12 +201,12 @@ function startCooldown() {
 
 // отправка сообщения
 async function sendMessage() {
-  if(sendBtn.disabled) return;
+  if (sendBtn.disabled) return;
   const text = input.value.trim();
-  if(!text) return;
+  if (!text) return;
 
-  addMessage(text,"user");
-  input.value="";
+  addMessage(text, "user");
+  input.value = "";
   localStorage.removeItem("draft_text");
   autoResize(input);
 
@@ -215,12 +215,20 @@ async function sendMessage() {
 
   const botMessage = addMessage("", "bot");
 
-  try{
+  try {
     const response = await fetch(`${BACKEND_URL}/ask?text=${encodeURIComponent(text)}`);
-    if(!response) botMessage.textContent = "Ошибка соединения с сервером.";
+
+    if (!response.ok) {
+      botMessage.textContent = "Ошибка соединения с сервером.";
+      return;
+    }
+
+    // Получаем просто текст
+    const data = await response.text();
+
     clearInterval(typingDotsInterval);
-    typeEffectWithDots(botMessage, response);
-  }catch(err){
+    typeEffectWithDots(botMessage, data); // передаем текст напрямую
+  } catch (err) {
     botMessage.textContent = "Ошибка соединения с сервером.";
   }
 }
