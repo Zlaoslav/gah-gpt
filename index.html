@@ -219,7 +219,7 @@ async function sendMessage() {
     const response = await fetch(`${BACKEND_URL}/ask?text=${encodeURIComponent(text)}`);
     if(!response) botMessage.textContent = "Ошибка соединения с сервером.";
     clearInterval(typingDotsInterval);
-    typeEffectWithDots(botMessage, data.response);
+    typeEffectWithDots(botMessage, response);
   }catch(err){
     botMessage.textContent = "Ошибка соединения с сервером.";
   }
