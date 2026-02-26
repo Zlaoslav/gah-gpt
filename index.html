@@ -67,8 +67,8 @@ header h1 { margin: 0; font-size: 18px; font-weight: 600; }
 
 #input-container {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: flex-end;
+  gap: 10px;
   padding: 14px 20px;
   background: var(--surface);
   border-top: 1px solid var(--border);
@@ -86,6 +86,7 @@ header h1 { margin: 0; font-size: 18px; font-weight: 600; }
   resize: none;
   overflow: hidden;
   line-height: 1.4;
+  max-height: 150px; /* ограничение роста поля */
   transition: border 0.2s, background 0.2s;
 }
 
@@ -101,12 +102,13 @@ button {
   color: white;
   font-weight: 600;
   transition: opacity 0.2s, transform 0.1s;
+  flex-shrink: 0;
 }
 button:disabled { opacity: 0.4; cursor: not-allowed; }
 button:hover:not(:disabled) { opacity: 0.9; }
 button:active:not(:disabled) { transform: scale(0.97); }
 
-#limitWarning { color: var(--warn); font-size: 13px; }
+#limitWarning { color: var(--warn); font-size: 13px; margin-left: 10px; }
 </style>
 </head>
 <body>
@@ -120,10 +122,8 @@ button:active:not(:disabled) { transform: scale(0.97); }
 
 <div id="input-container">
   <textarea id="textInput" placeholder="Введите сообщение..." rows="1"></textarea>
-  <div style="display:flex; align-items:center; gap:10px;">
-    <button id="sendBtn" onclick="sendMessage()">Отправить</button>
-    <div id="limitWarning"></div>
-  </div>
+  <button id="sendBtn" onclick="sendMessage()">Отправить</button>
+  <div id="limitWarning"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -171,7 +171,7 @@ input.addEventListener("keydown", e => {
 
 function autoResize(el){
   el.style.height = "auto";
-  el.style.height = el.scrollHeight + "px";
+  el.style.height = Math.min(el.scrollHeight, 150) + "px"; // ограничение
 }
 
 function checkLimit(){
@@ -184,7 +184,6 @@ function checkLimit(){
   }
 }
 
-// рендер сообщений без пустого span для бот-сообщений (чтобы кнопка не съезжала)
 function renderMessage(text, role){
   const msg = document.createElement("div");
   msg.className = `message ${role}`;
@@ -207,7 +206,6 @@ function typeEffectWithDots(element, text, speed=18){
     if(i >= text.length){
       clearInterval(typingDotsInterval);
       element.innerHTML = marked.parse(text);
-      element.style.maxWidth = "65%";
       chat.scrollTop = chat.scrollHeight;
       return;
     }
