@@ -144,7 +144,7 @@ button:active:not(:disabled) {
 
 <header>
   <img src="https://zlaoslav.github.io/gah-gpt/favicon.ico">
-  <h1>Test GPT</h1>
+  <h1>Гах ГПТ by Slavik!</h1>
 </header>
 
 <div id="chat"></div>
@@ -156,8 +156,8 @@ button:active:not(:disabled) {
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
-const BACKEND_URL = "http://gahgpt.slavi.workers.dev"; // замени на свой
-const COOLDOWN = 11; // сек
+const BACKEND_URL = "http://gahgpt.slavi.workers.dev";
+const COOLDOWN = 11;
 
 const input = document.getElementById("textInput");
 const chat = document.getElementById("chat");
@@ -168,7 +168,6 @@ let cooldownTimer = 0;
 window.onload = () => {
   const savedText = localStorage.getItem("draft_text");
   if (savedText) input.value = savedText;
-  startCooldown(); // если нужно сразу кулдаун
 };
 
 input.addEventListener("input", () => {
